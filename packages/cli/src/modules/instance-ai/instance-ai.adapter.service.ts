@@ -65,6 +65,7 @@ import type {
 	EvaluationConfigDetail,
 	UpsertEvaluationConfigInput,
 	InstanceAiMcpService,
+	InstanceAiExecuteNodeService,
 	McpRegistryServerSummary,
 	ModelConfig,
 } from '@n8n/instance-ai';
@@ -83,6 +84,7 @@ import type { WorkflowJSON } from '@n8n/workflow-sdk';
 import { InstanceSettings } from 'n8n-core';
 import {
 	type ICredentialsDecrypted,
+	type IDataObject,
 	type INode,
 	type INodeParameters,
 	type INodeProperties,
@@ -139,6 +141,7 @@ import { MCP_REGISTRY_PACKAGE_NAME } from '@/modules/mcp-registry/node-descripti
 import type { McpRegistrySearchResult } from '@/modules/mcp-registry/registry/mcp-registry-search';
 import { McpRegistryService } from '@/modules/mcp-registry/registry/mcp-registry.service';
 import { NodeCatalogService } from '@/node-catalog';
+import { ExecuteNodeService } from '@/node-execution';
 import { NodeTypes } from '@/node-types';
 import { userHasScopes } from '@/permissions.ee/check-access';
 import { PostHogClient } from '@/posthog';
@@ -287,6 +290,7 @@ export class InstanceAiAdapterService {
 		// DI (by type, not position) always provides it in a running instance.
 		private readonly evaluationConfigService?: EvaluationConfigService,
 		private readonly llmJudgeProviderRegistry?: LlmJudgeProviderRegistry,
+		private readonly executeNodeService?: ExecuteNodeService,
 	) {
 		this.logger = logger.scoped('instance-ai');
 		this.allowSendingParameterValues = globalConfig.ai.allowSendingParameterValues;
@@ -364,6 +368,9 @@ export class InstanceAiAdapterService {
 					}
 				: {}),
 			mcpService: mcpConnectionsEnabled ? this.createMcpAdapter(user) : undefined,
+			executeNodeService: this.executeNodeService
+				? this.createExecuteNodeAdapter(this.executeNodeService, user)
+				: undefined,
 			webResearchService: this.createWebResearchAdapter(user, searchProxyConfig),
 			workspaceService: this.createWorkspaceAdapter(user),
 			templatesService: this.getTemplatesService(),
@@ -473,6 +480,27 @@ export class InstanceAiAdapterService {
 				toSummaries(await Container.get(McpRegistryService).resolveBySlugs(slugs)),
 			listConnections: async (): Promise<Array<{ slug: string }>> =>
 				await this.listMcpRegistryConnections(user),
+		};
+	}
+
+	private createExecuteNodeAdapter(
+		executeNodeService: ExecuteNodeService,
+		user: User,
+	): InstanceAiExecuteNodeService {
+		return {
+			execute: async (request) => {
+				this.assertInstanceNotReadOnly('executions');
+				return await executeNodeService.run(user, {
+					type: request.type,
+					version: request.version,
+					config: {
+						parameters: request.config.parameters as INodeParameters,
+						credentials: request.config.credentials,
+					},
+					input: request.input as Array<{ json: IDataObject }> | undefined,
+					timeoutMs: request.timeoutMs,
+				});
+			},
 		};
 	}
 
