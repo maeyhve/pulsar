@@ -2,7 +2,7 @@ import type { CredentialProvider, McpClient, McpServerConfig } from '@n8n/agents
 import type { AgentJsonMcpServerConfig } from '@n8n/api-types';
 import type { CustomFetch } from '@n8n/backend-network';
 import { ensureError } from '@n8n/utils/errors/ensure-error';
-import { isMcpOAuth2Authentication, OperationalError } from 'n8n-workflow';
+import { isExpression, isMcpOAuth2Authentication, OperationalError } from 'n8n-workflow';
 import type { ICredentialDataDecryptedObject } from 'n8n-workflow';
 
 import type { OauthService } from '@/oauth/oauth.service';
@@ -202,6 +202,17 @@ export async function buildMcpClientForServer(
 	} = await deriveAuthHeaders(server, credentialProvider);
 	const allowedDomains = credentialData ? resolveAllowedDomains(credentialData) : undefined;
 
+	// A registry-derived MCP server's url can be a per-credential template
+	// (e.g. Databricks Genie's `={{$self["host"]}}/...`), resolved the same
+	// way McpRegistryClientTool resolves it: prefer the connected credential's
+	// own resolved serverUrl over the raw, still-unresolved template.
+	const resolvedUrl =
+		isExpression(server.url) &&
+		typeof credentialData?.serverUrl === 'string' &&
+		credentialData.serverUrl.length > 0
+			? credentialData.serverUrl
+			: server.url;
+
 	const onUnauthorized =
 		isMcpOAuth2Authentication(server.authentication) && server.credential
 			? async () => {
@@ -234,7 +245,7 @@ export async function buildMcpClientForServer(
 
 	const sdkServerConfig: McpServerConfig = {
 		name: server.name,
-		url: server.url,
+		url: resolvedUrl,
 		transport: server.transport,
 		fetch: authFetch,
 		toolFilter: server.toolFilter,

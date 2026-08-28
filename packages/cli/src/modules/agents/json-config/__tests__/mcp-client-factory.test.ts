@@ -304,6 +304,67 @@ describe('buildMcpClientForServer — SDK config mapping', () => {
 		const [configs] = mcpClientCtor.mock.calls[0] as [Array<Record<string, unknown>>];
 		expect(configs[0]).not.toHaveProperty('onConnectionFailed');
 	});
+
+	it('resolves a templated url from the credential serverUrl when set', async () => {
+		const credentialProvider = mock<CredentialProvider>();
+		const oauthService = mock<OauthService>();
+		credentialProvider.resolve.mockResolvedValue({
+			serverUrl: 'https://acme.cloud.databricks.com/api/2.0/mcp/genie',
+		} as never);
+		proxyFetchMock.mockResolvedValue(makeOk());
+
+		await buildMcpClientForServer(
+			makeServer({
+				url: '={{$self["host"]}}/api/2.0/mcp/genie',
+				authentication: 'databricksGenieMcpOAuth2Api',
+				credential: 'cred-1',
+			}),
+			{ credentialProvider, oauthService, projectId: 'proj-1', proxyFetch },
+		);
+
+		const [configs] = mcpClientCtor.mock.calls[0] as [Array<Record<string, unknown>>];
+		expect(configs[0].url).toBe('https://acme.cloud.databricks.com/api/2.0/mcp/genie');
+	});
+
+	it('falls back to the raw templated url when the credential has no serverUrl', async () => {
+		const credentialProvider = mock<CredentialProvider>();
+		const oauthService = mock<OauthService>();
+		credentialProvider.resolve.mockResolvedValue({} as never);
+		proxyFetchMock.mockResolvedValue(makeOk());
+
+		await buildMcpClientForServer(
+			makeServer({
+				url: '={{$self["host"]}}/api/2.0/mcp/genie',
+				authentication: 'databricksGenieMcpOAuth2Api',
+				credential: 'cred-1',
+			}),
+			{ credentialProvider, oauthService, projectId: 'proj-1', proxyFetch },
+		);
+
+		const [configs] = mcpClientCtor.mock.calls[0] as [Array<Record<string, unknown>>];
+		expect(configs[0].url).toBe('={{$self["host"]}}/api/2.0/mcp/genie');
+	});
+
+	it('leaves a non-templated url untouched even when the credential happens to have a serverUrl', async () => {
+		const credentialProvider = mock<CredentialProvider>();
+		const oauthService = mock<OauthService>();
+		credentialProvider.resolve.mockResolvedValue({
+			serverUrl: 'https://unrelated.example.com/mcp',
+		} as never);
+		proxyFetchMock.mockResolvedValue(makeOk());
+
+		await buildMcpClientForServer(
+			makeServer({
+				url: 'https://mcp.notion.com/mcp',
+				authentication: 'notionMcpOAuth2Api',
+				credential: 'cred-1',
+			}),
+			{ credentialProvider, oauthService, projectId: 'proj-1', proxyFetch },
+		);
+
+		const [configs] = mcpClientCtor.mock.calls[0] as [Array<Record<string, unknown>>];
+		expect(configs[0].url).toBe('https://mcp.notion.com/mcp');
+	});
 });
 
 // ---------------------------------------------------------------------------
