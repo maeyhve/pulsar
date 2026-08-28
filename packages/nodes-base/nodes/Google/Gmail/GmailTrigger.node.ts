@@ -623,13 +623,13 @@ export class GmailTrigger implements INodeType {
 				}
 
 				if (!messages.length && !allFetchedMessages.length) {
-					// No-progress valve: the page cap stopped the scan short, yet every id
-					// it reached is already tracked. Holding again would repeat this
+					// No-progress valve: the budget or the cap stopped the scan short, yet
+					// every id it reached is already tracked. Holding again would repeat this
 					// tick forever — no backlog progress and no new mail. Give up loudly:
-					// jump the cursor to now and skip what the cap keeps unreachable.
+					// jump the cursor to now and skip what stays out of reach.
 					if (!windowFullyScanned) {
 						this.logger.warn(
-							'Gmail Trigger backlog cannot progress past the page cap; advancing past older messages it could not scan',
+							"Gmail Trigger backlog cannot progress within one poll's reach; advancing past older messages it could not scan",
 							{ node: node.name },
 						);
 						nodeStaticData.lastTimeChecked = +now;
@@ -642,7 +642,8 @@ export class GmailTrigger implements INodeType {
 				}
 			}
 
-			// Take only what fits in the remaining budget, store the rest as pending.
+			// Take only what fits in the remaining maxResults budget, store the rest
+			// as pending.
 			let messagesToProcess = messages;
 			let beyondBudgetIds: string[] = [];
 			if (shouldLimitMessages && messages.length > budget) {
