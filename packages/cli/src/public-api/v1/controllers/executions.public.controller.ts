@@ -2,9 +2,11 @@ import {
 	DeletedExecutionPublicDto,
 	ExecutionListPublicDto,
 	ExecutionPublicDto,
+	ExecutionTagsPublicDto,
 	GetExecutionQueryDto,
 	ListExecutionsQueryDto,
 	MAX_ITEMS_PER_PAGE,
+	TagIdsPublicDto,
 } from '@n8n/api-types';
 import { ExecutionsConfig } from '@n8n/config';
 import type { AuthenticatedRequest, IExecutionBase, IExecutionResponse } from '@n8n/db';
@@ -15,10 +17,12 @@ import {
 	ApiResponse,
 	ApiSummary,
 	ApiTags,
+	Body,
 	Delete,
 	Get,
 	Param,
 	PublicApiController,
+	Put,
 	Query,
 } from '@n8n/decorators';
 import type { Response } from 'express';
@@ -233,6 +237,63 @@ export class ExecutionsPublicController {
 		const execution = await this.executionService.deleteOne(executionId, sharedWorkflowsIds);
 
 		return this.toDeletedExecutionPublicDto(execution, executionId);
+	}
+
+	@Get('/:executionId/tags')
+	@ApiKeyScope('executionTags:list')
+	@ApiSummary('Get execution tags')
+	@ApiDescription('Get annotation tags for an execution.')
+	@ApiTags(['Execution'])
+	@ApiResponse(200, ExecutionTagsPublicDto)
+	@ApiErrorResponse(404)
+	async getExecutionTags(
+		req: AuthenticatedRequest,
+		_res: Response,
+		@Param('executionId') executionId: string,
+	): Promise<ExecutionTagsPublicDto> {
+		const sharedWorkflowsIds = await this.workflowSharingService.getSharedWorkflowIdsForScopes(
+			req.user,
+			['workflow:read'],
+		);
+
+		if (!sharedWorkflowsIds.length) {
+			throw new NotFoundError('Not Found');
+		}
+
+		const tags = await this.executionService.getExecutionTags(executionId, sharedWorkflowsIds);
+
+		return this.serialize<ExecutionTagsPublicDto>(tags);
+	}
+
+	@Put('/:executionId/tags')
+	@ApiKeyScope('executionTags:update')
+	@ApiSummary('Update tags of an execution')
+	@ApiDescription('Update annotation tags of an execution.')
+	@ApiTags(['Execution'])
+	@ApiResponse(200, ExecutionTagsPublicDto)
+	@ApiErrorResponse(404)
+	async updateExecutionTags(
+		req: AuthenticatedRequest,
+		_res: Response,
+		@Param('executionId') executionId: string,
+		@Body body: TagIdsPublicDto,
+	): Promise<ExecutionTagsPublicDto> {
+		const sharedWorkflowsIds = await this.workflowSharingService.getSharedWorkflowIdsForScopes(
+			req.user,
+			['workflow:update'],
+		);
+
+		if (!sharedWorkflowsIds.length) {
+			throw new NotFoundError('Not Found');
+		}
+
+		const tags = await this.executionService.updateExecutionTags(
+			executionId,
+			body.map((tag) => tag.id),
+			sharedWorkflowsIds,
+		);
+
+		return this.serialize<ExecutionTagsPublicDto>(tags);
 	}
 
 	private toExecutionListItem(execution: PublicExecution) {
