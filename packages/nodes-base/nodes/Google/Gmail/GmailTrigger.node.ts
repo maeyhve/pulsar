@@ -328,6 +328,8 @@ export class GmailTrigger implements INodeType {
 		const shouldLimitMessages = node.typeVersion >= 1.4 && this.getMode() !== 'manual';
 		// How far this tick may reach before it must return — bounds listing and
 		// fetching time, not delivery volume (maxResults stays the per-tick bound).
+		// Only consulted on shouldLimitMessages paths; pre-1.4 and manual polls are
+		// unchanged.
 		const pollDeadline = Date.now() + this.getPollBudgetMs();
 		const maxResults = shouldLimitMessages
 			? (this.getNodeParameter('maxResults', 10) as number)
@@ -446,6 +448,8 @@ export class GmailTrigger implements INodeType {
 		let windowFullyScanned = false;
 
 		try {
+			// Item-count budget (remaining maxResults) — distinct from the time
+			// budget behind pollDeadline.
 			let budget = maxResults;
 
 			// A message whose fetch failed waits in its own list rather than in the
@@ -492,8 +496,8 @@ export class GmailTrigger implements INodeType {
 			}
 
 			// Process pending messages from a previous poll next. These are IDs a scan
-			// found but no poll fetched: beyond the maxResults budget, or left over when
-			// a fetch failed mid-poll.
+			// found but no poll fetched: beyond the maxResults budget, past this poll's
+			// time budget, or left over when a fetch failed mid-poll.
 			const pendingIds = nodeStaticData.pendingMessageIds ?? [];
 			if (shouldLimitMessages && pendingIds.length > 0 && budget > 0) {
 				const fetchQs = buildFetchQs();
@@ -581,6 +585,9 @@ export class GmailTrigger implements INodeType {
 			let messages: ListMessage[] = [];
 			let pageToken: string | undefined;
 			let pagesScanned = 0;
+			// The deadline sits in the loop condition: the do-while always scans page
+			// one, so an already-spent budget still makes progress (mirrors the fetch
+			// loops).
 			do {
 				const messagesResponse: MessageListResponse = await googleApiRequest.call(
 					this,
