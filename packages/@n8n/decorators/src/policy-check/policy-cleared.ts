@@ -31,7 +31,7 @@ export type PolicySubject = {
  * generate it on insert), and treating that as present would bind every create to the same
  * `undefined` subject — a token for one create would then clear any other.
  */
-export function workflowSubject(workflow: PolicedWorkflow): PolicySubject {
+export function workflowSubject(workflow: Pick<PolicedWorkflow, 'id' | 'nodes'>): PolicySubject {
 	if (workflow.id) return { type: 'workflow', id: workflow.id };
 
 	// Same object within one request, so key order is stable.
