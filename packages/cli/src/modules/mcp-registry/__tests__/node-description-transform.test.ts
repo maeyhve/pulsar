@@ -738,7 +738,7 @@ describe('serverToCredentialDescription', () => {
 			expect(oldPickRemote(databricksGenieTemplatedMockServer)).toBeNull();
 		});
 
-		it('even if a future old-ish version matched the type by name, new URL() on the expression rejects it independently', () => {
+		it('even if a row used the plain streamable-http type with a template-string url, new URL() rejects it independently', () => {
 			const serverWithOldTypeName: McpRegistryServer = {
 				...databricksGenieTemplatedMockServer,
 				remotes: databricksGenieTemplatedMockServer.remotes.map((remote) => ({

@@ -183,16 +183,13 @@ function serverToExtendedCredentialDescription(
 		}),
 	);
 
-	const serverUrlOverride: INodeProperties[] = remote.isTemplated
-		? [
-				{
-					displayName: 'Server URL',
-					name: 'serverUrl',
-					type: 'hidden',
-					default: remote.endpointUrl,
-				},
-			]
-		: [];
+	const serverUrlProperty: INodeProperties = {
+		displayName: 'Server URL',
+		name: 'serverUrl',
+		type: 'hidden',
+		default: remote.endpointUrl,
+	};
+	const serverUrlOverride = remote.isTemplated ? [serverUrlProperty] : [];
 
 	const allowedDomainsDefault = remote.isTemplated
 		? '={{$self["host"].extractDomain()}}'
