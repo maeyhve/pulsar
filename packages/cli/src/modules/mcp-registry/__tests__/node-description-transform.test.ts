@@ -698,6 +698,68 @@ describe('serverToCredentialDescription', () => {
 
 		expect(serverToCredentialDescription(server, isKnownCredentialType)).toBeNull();
 	});
+
+	describe('back-compat: an old n8n instance loading a streamable-http-templated row', () => {
+		/**
+		 * Verbatim snapshot of pickRemote/resolveCredentialRemote as they shipped
+		 * before this ticket (commit e60c43112c3, the tip this feature branched
+		 * from). Neither function knows about `streamable-http-templated`, so this
+		 * proves the exact pre-existing code drops the row, not a stand-in that
+		 * merely resembles it. Two independent guards do the dropping, checked
+		 * separately below: the unrecognised-type match in pickRemote, and the
+		 * new URL() parse in resolveCredentialRemote, so a future change to
+		 * either one alone still leaves old instances safe.
+		 */
+		function oldPickRemote(
+			server: McpRegistryServer,
+		): { transport: 'httpStreamable' | 'sse'; endpointUrl: string } | null {
+			const streamable = server.remotes.find((r) => r.type === 'streamable-http');
+			if (streamable) return { transport: 'httpStreamable', endpointUrl: streamable.url };
+
+			const sse = server.remotes.find((r) => r.type === 'sse');
+			if (sse) return { transport: 'sse', endpointUrl: sse.url };
+
+			return null;
+		}
+
+		function oldResolveCredentialRemote(
+			server: McpRegistryServer,
+		): { endpointUrl: string; hostname: string } | null {
+			const remote = oldPickRemote(server);
+			if (!remote) return null;
+			try {
+				return { endpointUrl: remote.endpointUrl, hostname: new URL(remote.endpointUrl).hostname };
+			} catch {
+				return null;
+			}
+		}
+
+		it('old pickRemote never matches streamable-http-templated, so the row is invisible to it', () => {
+			expect(oldPickRemote(databricksGenieTemplatedMockServer)).toBeNull();
+		});
+
+		it('even if a future old-ish version matched the type by name, new URL() on the expression rejects it independently', () => {
+			const serverWithOldTypeName: McpRegistryServer = {
+				...databricksGenieTemplatedMockServer,
+				remotes: databricksGenieTemplatedMockServer.remotes.map((remote) => ({
+					...remote,
+					type: 'streamable-http',
+				})),
+			};
+
+			expect(oldResolveCredentialRemote(serverWithOldTypeName)).toBeNull();
+		});
+
+		it('the current, patched code builds a tile old code could never build for the same row', () => {
+			expect(
+				serverToCredentialDescription(
+					databricksGenieTemplatedMockServer,
+					(name) => name === 'databricksOAuth2Api',
+				),
+			).not.toBeNull(); // current code DOES build a tile once the parent credential is known...
+			expect(oldPickRemote(databricksGenieTemplatedMockServer)).toBeNull(); // ...but old code drops it regardless
+		});
+	});
 });
 
 describe('getMcpRegistryCredentialTypeName', () => {
