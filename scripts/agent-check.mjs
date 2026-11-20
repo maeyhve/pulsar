@@ -117,12 +117,29 @@ async function diagnostics() {
 	return { excerpt: excerpt.length ? excerpt.slice(0, 24) : lastLines, artifacts };
 }
 
+/**
+ * Runs a pnpm command. Use the pnpm that launched this script when possible,
+ * so the child uses the same version as the parent.
+ * A shell is required on Windows to resolve a bare `pnpm.cmd` shim.
+ */
+function spawnPnpm(commandArgs, options) {
+	const execPath = process.env.npm_execpath;
+	if (execPath?.endsWith('.exe')) return spawn(execPath, commandArgs, options);
+	if (execPath && /\.(?:c?js|mjs)$/.test(execPath)) {
+		return spawn(process.execPath, [execPath, ...commandArgs], options);
+	}
+	return spawn('pnpm', commandArgs, {
+		...options,
+		shell: process.platform === 'win32',
+	});
+}
+
 async function main() {
 	const start = Date.now();
 	const fd = openSync(logPath, 'w');
 	if (!values.json) process.stdout.write(`▶ ${mode}\n`);
 	const result = await new Promise((resolveResult) => {
-		const child = spawn('pnpm', args, {
+		const child = spawnPnpm(args, {
 			cwd: ROOT,
 			env: { ...process.env, FORCE_COLOR: '0' },
 			stdio: ['ignore', fd, fd],

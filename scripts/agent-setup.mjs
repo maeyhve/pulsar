@@ -119,9 +119,7 @@ const stepsToRun = step === 'all' ? ['install', 'build', 'test'] : [step];
 const NODE_OPTS = `--max-old-space-size=${mem}`;
 const childEnv = {
 	...process.env,
-	NODE_OPTIONS: process.env.NODE_OPTIONS
-		? `${process.env.NODE_OPTIONS} ${NODE_OPTS}`
-		: NODE_OPTS,
+	NODE_OPTIONS: process.env.NODE_OPTIONS ? `${process.env.NODE_OPTIONS} ${NODE_OPTS}` : NODE_OPTS,
 	FORCE_COLOR: '0',
 };
 
@@ -129,16 +127,33 @@ function elapsed(start) {
 	return Math.max(1, Math.round((Date.now() - start) / 1000));
 }
 
+/**
+ * Runs a pnpm command. Use the pnpm that launched this script when possible,
+ * so the child uses the same version as the parent.
+ * A shell is required on Windows to resolve a bare `pnpm.cmd` shim.
+ */
+function spawnPnpm(args, options) {
+	const execPath = process.env.npm_execpath;
+	if (execPath?.endsWith('.exe')) return spawn(execPath, args, options);
+	if (execPath && /\.(?:c?js|mjs)$/.test(execPath)) {
+		return spawn(process.execPath, [execPath, ...args], options);
+	}
+	return spawn('pnpm', args, {
+		...options,
+		shell: process.platform === 'win32',
+	});
+}
+
 function runStep(name) {
 	return new Promise((res) => {
-		const { cmd, args } = PLAN[name];
+		const { args } = PLAN[name];
 		const logPath = resolve(logDir, `${name}.log`);
 		const start = Date.now();
 		const logFd = openSync(logPath, 'w');
 
 		if (!values.json) process.stdout.write(`▶ ${name.padEnd(7)} `);
 
-		const child = spawn(cmd, args, {
+		const child = spawnPnpm(args, {
 			cwd: REPO_ROOT,
 			env: childEnv,
 			stdio: ['ignore', logFd, logFd],
