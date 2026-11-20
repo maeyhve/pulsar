@@ -17,6 +17,10 @@ Use the faster and more granular dev commands inside the n8n and n8n-editor-ui p
 +--------------------------------------------------------------------------+
 | Backend & Frontend with hot reloading                                    |
 |                                                                          |
+|   pnpm dev:all                                                           |
+|                                                                          |
+| Or run the two commands in separate terminals:                           |
+|                                                                          |
 |   pnpm dev:be                                                            |
 |   pnpm dev:fe:editor                                                     |
 |                                                                          |
