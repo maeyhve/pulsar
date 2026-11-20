@@ -69,6 +69,11 @@ The most important directories:
 If you want to change or extend n8n you have to make sure that all the needed
 dependencies are installed and the packages get linked correctly. Here's a short guide on how that can be done:
 
+Choose one of these guides:
+
+- [Recommended development setup](docs/development/recommended-development.md) for a machine with 16 GB RAM or more.
+- [Development on a low-spec machine](docs/development/low-spec-development.md) for a machine with 8 GB RAM or less.
+
 ### Dev Container
 
 If you already have VS Code and Docker installed, you can click [here](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/n8n-io/n8n) to get started. Clicking these links will cause VS Code to automatically install the Dev Containers extension if needed, clone the source code into a container volume, and spin up a dev container for use.
